@@ -44,9 +44,22 @@ class MySQLHeatwaveClient:
 
         return self.connection
 
+    def execute_sql(self, sql: str):
+        """Execute a SQL string (single or multiple statements)."""
+        conn = self.connect()
+        if not conn:
+            print("No active connection.")
+            return
 
-# Example usage:
-if __name__ == "__main__":
-    client = MySQLHeatwaveClient()
-    conn = client.connect()
-    print(conn)
+        cursor = conn.cursor()
+        try:
+            statements = [stmt.strip() for stmt in sql.split(';') if stmt.strip()]
+            for stmt in statements:
+                cursor.execute(stmt)
+            conn.commit()
+        except Error as e:
+            print(f"Error executing SQL: {e}")
+        finally:
+            cursor.close()
+            conn.close()
+
