@@ -10,7 +10,7 @@ CREATE TABLE
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (document_id),
-        UNIQUE KEY uix_object_url (object_url)
+        UNIQUE KEY uix_object_url (object_url(191))  
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE
