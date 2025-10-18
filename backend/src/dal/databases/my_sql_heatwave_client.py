@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import mysql.connector
+from mysql.connector import Error
 import os
 from threading import Lock
 
