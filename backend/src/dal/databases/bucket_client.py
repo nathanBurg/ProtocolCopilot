@@ -67,8 +67,9 @@ class BucketClient:
                 content_type=content_type
             )
             
-            # Generate object URL
-            object_url = f"{'https' if self.secure else 'http'}://{self.endpoint}/{self.bucket_name}/{object_name}"
+            # Generate object URL - use external endpoint for frontend access
+            external_endpoint = os.getenv('MINIO_EXTERNAL_ENDPOINT', 'localhost:9000')
+            object_url = f"{'https' if self.secure else 'http'}://{external_endpoint}/{self.bucket_name}/{object_name}"
             
             logger.info(f"Successfully uploaded file: {object_name}")
             return object_url

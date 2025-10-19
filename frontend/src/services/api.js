@@ -43,3 +43,15 @@ export const uploadProtocol = async (formData) => {
     throw new Error(`Failed to upload protocol: ${error.message}`)
   }
 }
+
+export const createProtocol = async (protocol, protocolSteps) => {
+  try {
+    const response = await api.post('/protocols/create', {
+      protocol: protocol,
+      protocol_steps: protocolSteps
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(`Failed to create protocol: ${error.message}`)
+  }
+}

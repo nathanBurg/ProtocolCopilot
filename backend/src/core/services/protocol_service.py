@@ -1,5 +1,5 @@
 from src.dal.integrations.gemini_client import GeminiClientSingleton
-from src.core.entities.protocol_entities import Protocol, CreateProtocolPreviewRequest, ProtocolDocument, IngestionStatus, ProtocolStep
+from src.core.entities.protocol_entities import Protocol, CreateProtocolPreviewRequest, ProtocolDocument, IngestionStatus, ProtocolStep, ProtocolPreviewResponse
 from src.dal.databases.protocol_dal import ProtocolDAL
 from src.dal.databases.bucket_client import BucketClient
 import uuid
@@ -13,7 +13,7 @@ class ProtocolService:
         self.protocol_dal = ProtocolDAL()
         self.bucket_client = BucketClient()
 
-    def create_protocol_preview(self, request: CreateProtocolPreviewRequest) -> Protocol:
+    def create_protocol_preview(self, request: CreateProtocolPreviewRequest) -> ProtocolPreviewResponse:
         """Create a protocol preview from uploaded file"""
         try:
             # Determine content type based on file extension
@@ -62,7 +62,12 @@ class ProtocolService:
             for step in protocol_steps:
                 self.protocol_dal.create_protocol_step(step)
             
-            return protocol
+            # Return both protocol and steps with object URL
+            return ProtocolPreviewResponse(
+                protocol=saved_protocol,
+                protocol_steps=protocol_steps,
+                object_url=object_url
+            )
             
         except Exception as e:
             raise Exception(f"Failed to create protocol preview: {str(e)}")
@@ -145,6 +150,21 @@ class ProtocolService:
         try:
             now = datetime.now()
             
+            # Create a simplified schema that doesn't include UUID fields
+            step_schema = {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "step_number": {"type": "integer"},
+                        "step_name": {"type": "string"},
+                        "instruction": {"type": "string"},
+                        "expected_duration_minutes": {"type": "integer"}
+                    },
+                    "required": ["step_number", "step_name", "instruction"]
+                }
+            }
+            
             response = self.gemini_client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=[
@@ -156,9 +176,6 @@ class ProtocolService:
                                     f"Given the following protocol text, produce JSON matching the schema for each step of the protocol.\n"
                                     f"There will often be a step with sub steps; in that case treat every step as its own step number.\n"
                                     f"If there is a time range given vs an exact time, select the upper bound of the time range.\n"
-                                    f"Use the following pre-assigned IDs:\n"
-                                    f"protocol_id: {protocol_id}\n"
-                                    f"Use current timestamp {now} for all created_at and updated_at fields.\n"
                                     f"Text:\n{text}"
                                 )
                             }
@@ -167,12 +184,26 @@ class ProtocolService:
                 ],
                 config={
                     "response_mime_type": "application/json",
-                    "response_schema": list[ProtocolStep],
+                    "response_schema": step_schema,
                 },
             )
             
+            # Parse the JSON response and create ProtocolStep objects with proper UUIDs
             steps_data = json.loads(response.text)
-            protocol_steps = [ProtocolStep(**step) for step in steps_data]
+            protocol_steps = []
+            
+            for step_data in steps_data:
+                protocol_step = ProtocolStep(
+                    protocol_step_id=uuid.uuid4(),  # Generate proper UUID
+                    protocol_id=protocol_id,
+                    step_number=step_data["step_number"],
+                    step_name=step_data["step_name"],
+                    instruction=step_data["instruction"],
+                    expected_duration_minutes=step_data.get("expected_duration_minutes"),
+                    created_at=now,
+                    updated_at=now
+                )
+                protocol_steps.append(protocol_step)
             
             return protocol_steps
             

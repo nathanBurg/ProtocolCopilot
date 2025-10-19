@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from typing import List
 import uuid
 from datetime import datetime
-from src.core.entities.protocol_entities import Protocol, ProtocolStep, ProtocolDocument, IngestionStatus, CreateProtocolPreviewRequest
+from src.core.entities.protocol_entities import Protocol, ProtocolStep, ProtocolDocument, IngestionStatus, CreateProtocolPreviewRequest, ProtocolPreviewResponse
+from src.dal.databases.protocol_dal import ProtocolDAL
 from src.core.services.protocol_service import ProtocolService
 
 router = APIRouter()
@@ -76,8 +77,13 @@ _fake_protocols = [
 
 @router.get("/protocols", tags=["protocols"], response_model=List[Protocol])
 async def get_protocols():
-    """Get all protocols with fake data for testing"""
-    return _fake_protocols
+    """Get all protocols from database"""
+    try:
+        protocol_dal = ProtocolDAL()
+        protocols = protocol_dal.get_all_protocols()
+        return protocols
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching protocols: {str(e)}")
 
 @router.get("/protocols/{protocol_id}", tags=["protocols"], response_model=Protocol)
 async def get_protocol_by_id(protocol_id: str):
@@ -87,13 +93,20 @@ async def get_protocol_by_id(protocol_id: str):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid protocol ID format")
     
-    for protocol in _fake_protocols:
-        if protocol.protocol_id == protocol_uuid:
-            return protocol
-    
-    raise HTTPException(status_code=404, detail="Protocol not found")
+    try:
+        protocol_dal = ProtocolDAL()
+        protocol = protocol_dal.get_protocol(str(protocol_uuid))
+        
+        if not protocol:
+            raise HTTPException(status_code=404, detail="Protocol not found")
+        
+        return protocol
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching protocol: {str(e)}")
 
-@router.post("/protocols/upload", tags=["protocols"], response_model=Protocol)
+@router.post("/protocols/upload", tags=["protocols"], response_model=ProtocolPreviewResponse)
 async def upload_protocol(file: UploadFile = File(...)):
     """Upload a protocol document and validate file type"""
     
@@ -143,3 +156,103 @@ async def upload_protocol(file: UploadFile = File(...)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+@router.post("/protocols/create", tags=["protocols"], response_model=ProtocolPreviewResponse)
+async def create_protocol(protocol: Protocol, protocol_steps: List[ProtocolStep]):
+    """Create a new protocol with its steps"""
+    
+    try:
+        protocol_dal = ProtocolDAL()
+        
+        # Create a dummy protocol document if document_id doesn't exist
+        # This is needed for manually created protocols that don't have an associated document
+        try:
+            existing_document = protocol_dal.get_protocol_document(str(protocol.document_id))
+            if not existing_document:
+                # Create a dummy document for manually created protocols
+                dummy_document = ProtocolDocument(
+                    document_id=protocol.document_id,
+                    document_name=f"Manual Protocol - {protocol.protocol_name}",
+                    description="Manually created protocol (no source document)",
+                    object_url="",
+                    mime_type="text/plain",
+                    ingestion_status=IngestionStatus.INGESTED,
+                    ingested_at=datetime.now(),
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                protocol_dal.create_protocol_document(dummy_document)
+        except Exception as doc_error:
+            # If document lookup fails, create the dummy document
+            dummy_document = ProtocolDocument(
+                document_id=protocol.document_id,
+                document_name=f"Manual Protocol - {protocol.protocol_name}",
+                description="Manually created protocol (no source document)",
+                object_url="",
+                mime_type="text/plain",
+                ingestion_status=IngestionStatus.INGESTED,
+                ingested_at=datetime.now(),
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            protocol_dal.create_protocol_document(dummy_document)
+        
+        # Now create the protocol
+        saved_protocol = protocol_dal.create_protocol(protocol)
+        
+        # Create protocol steps
+        for step in protocol_steps:
+            protocol_dal.create_protocol_step(step)
+        
+        return ProtocolPreviewResponse(protocol=saved_protocol, protocol_steps=protocol_steps, object_url="")
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating protocol: {str(e)}")
+
+@router.get("/protocols/{protocol_id}/steps", tags=["protocols"], response_model=List[ProtocolStep])
+async def get_protocol_steps(protocol_id: str):
+    """Get all steps for a specific protocol"""
+    try:
+        protocol_uuid = uuid.UUID(protocol_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid protocol ID format")
+    
+    try:
+        protocol_dal = ProtocolDAL()
+        steps = protocol_dal.get_protocol_steps_by_protocol_id(str(protocol_uuid))
+        return steps
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching protocol steps: {str(e)}")
+
+@router.get("/protocols/{protocol_id}/complete", tags=["protocols"], response_model=ProtocolPreviewResponse)
+async def get_protocol_complete(protocol_id: str):
+    """Get a complete protocol with its steps"""
+    try:
+        protocol_uuid = uuid.UUID(protocol_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid protocol ID format")
+    
+    try:
+        protocol_dal = ProtocolDAL()
+        
+        # Get the protocol
+        protocol = protocol_dal.get_protocol(str(protocol_uuid))
+        if not protocol:
+            raise HTTPException(status_code=404, detail="Protocol not found")
+        
+        # Get the protocol steps
+        steps = protocol_dal.get_protocol_steps_by_protocol_id(str(protocol_uuid))
+        
+        # Get the document to find the object URL
+        document = protocol_dal.get_protocol_document(str(protocol.document_id))
+        object_url = document.object_url if document else ""
+        
+        return ProtocolPreviewResponse(
+            protocol=protocol,
+            protocol_steps=steps,
+            object_url=object_url
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching complete protocol: {str(e)}")

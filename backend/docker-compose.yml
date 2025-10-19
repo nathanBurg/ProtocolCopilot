@@ -10,12 +10,14 @@ services:
       - db
       - minio
     environment:
-      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/protocolcopilot
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_BUCKET_NAME=protocols
-      - MINIO_SECURE=false
+      - DATABASE_URL=${DATABASE_URL}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_EXTERNAL_ENDPOINT=${MINIO_EXTERNAL_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+      - MINIO_SECURE=${MINIO_SECURE}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     ports:
       - "8000:8000"
     volumes:
@@ -47,7 +49,18 @@ services:
       - "9001:9001"   # web console
     volumes:
       - minio_data:/data
+      - ./setup-minio.sh:/setup-minio.sh
     restart: always
+
+  minio-setup:
+    image: minio/mc:latest
+    container_name: protocolcopilot-minio-setup
+    depends_on:
+      - minio
+    volumes:
+      - ./setup-minio.sh:/setup-minio.sh
+    command: /bin/sh -c "chmod +x /setup-minio.sh && /setup-minio.sh"
+    restart: "no"
 
 volumes:
   pgdata:

@@ -23,17 +23,14 @@ class PostgreSQLClient:
             self._initialized = True
 
     def connect(self):
-        if self.connection and not self.connection.closed:
-            return self.connection
-
+        # Always create a new connection for each request to avoid connection issues
         try:
-            self.connection = psycopg2.connect(self.database_url)
+            connection = psycopg2.connect(self.database_url)
             print("Connected to PostgreSQL successfully.")
+            return connection
         except psycopg2.Error as err:
             print(f"Connection failed: {err}")
-            self.connection = None
-
-        return self.connection
+            return None
 
     def execute_sql(self, sql: str):
         """Execute a SQL string (single or multiple statements)."""

@@ -76,8 +76,10 @@ function AddProtocolPage() {
       const formData = new FormData()
       formData.append('file', file)
       
-      await uploadProtocol(formData)
-      navigate('/')
+      const response = await uploadProtocol(formData)
+      navigate('/protocol-preview', { 
+        state: { previewData: response } 
+      })
     } catch (err) {
       setError(err.message)
     } finally {

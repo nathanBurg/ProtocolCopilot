@@ -21,10 +21,18 @@ class ProtocolDAL:
                 (document_id, document_name, description, object_url, mime_type, 
                  ingestion_status, ingested_at, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (document_id) DO UPDATE SET
+                    document_name = EXCLUDED.document_name,
+                    description = EXCLUDED.description,
+                    object_url = EXCLUDED.object_url,
+                    mime_type = EXCLUDED.mime_type,
+                    ingestion_status = EXCLUDED.ingestion_status,
+                    ingested_at = EXCLUDED.ingested_at,
+                    updated_at = EXCLUDED.updated_at
                 RETURNING *
             """
             cursor.execute(sql, (
-                document.document_id,
+                str(document.document_id),
                 document.document_name,
                 document.description,
                 document.object_url,
@@ -98,14 +106,20 @@ class ProtocolDAL:
                 (protocol_id, document_id, protocol_name, description, 
                  created_by_user_id, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (protocol_id) DO UPDATE SET
+                    document_id = EXCLUDED.document_id,
+                    protocol_name = EXCLUDED.protocol_name,
+                    description = EXCLUDED.description,
+                    created_by_user_id = EXCLUDED.created_by_user_id,
+                    updated_at = EXCLUDED.updated_at
                 RETURNING *
             """
             cursor.execute(sql, (
-                protocol.protocol_id,
-                protocol.document_id,
+                str(protocol.protocol_id),
+                str(protocol.document_id),
                 protocol.protocol_name,
                 protocol.description,
-                protocol.created_by_user_id,
+                str(protocol.created_by_user_id) if protocol.created_by_user_id else None,
                 protocol.created_at,
                 protocol.updated_at
             ))
@@ -192,11 +206,18 @@ class ProtocolDAL:
                 (protocol_step_id, protocol_id, step_number, step_name, 
                  instruction, expected_duration_minutes, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (protocol_step_id) DO UPDATE SET
+                    protocol_id = EXCLUDED.protocol_id,
+                    step_number = EXCLUDED.step_number,
+                    step_name = EXCLUDED.step_name,
+                    instruction = EXCLUDED.instruction,
+                    expected_duration_minutes = EXCLUDED.expected_duration_minutes,
+                    updated_at = EXCLUDED.updated_at
                 RETURNING *
             """
             cursor.execute(sql, (
-                protocol_step.protocol_step_id,
-                protocol_step.protocol_id,
+                str(protocol_step.protocol_step_id),
+                str(protocol_step.protocol_id),
                 protocol_step.step_number,
                 protocol_step.step_name,
                 protocol_step.instruction,

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from enum import StrEnum
 import uuid
@@ -61,6 +61,15 @@ class CreateProtocolPreviewRequest(BaseModel):
     file_size: Optional[int] = None
     description: Optional[str] = None
     created_by_user_id: Optional[uuid.UUID] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProtocolPreviewResponse(BaseModel):
+    protocol: Protocol
+    protocol_steps: List[ProtocolStep]
+    object_url: str
 
     class Config:
         from_attributes = True
