@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from enum import StrEnum
+import uuid
 
 
 class IngestionStatus(StrEnum):
@@ -11,7 +12,7 @@ class IngestionStatus(StrEnum):
 
 
 class ProtocolDocument(BaseModel):
-    document_id: int
+    document_id: uuid.UUID
     document_name: str
     description: Optional[str] = None
     object_url: str
@@ -26,11 +27,11 @@ class ProtocolDocument(BaseModel):
 
 
 class Protocol(BaseModel):
-    protocol_id: int
-    document_id: int
+    protocol_id: uuid.UUID
+    document_id: uuid.UUID
     protocol_name: str
     description: Optional[str] = None
-    created_by_user_id: Optional[int] = None
+    created_by_user_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
 
@@ -39,8 +40,8 @@ class Protocol(BaseModel):
 
 
 class ProtocolStep(BaseModel):
-    protocol_step_id: int
-    protocol_id: int
+    protocol_step_id: uuid.UUID
+    protocol_id: uuid.UUID
     step_number: int
     step_name: str
     instruction: str

@@ -1,45 +1,35 @@
 from dotenv import load_dotenv
-import mysql.connector
-from mysql.connector import Error
+import psycopg2
+from psycopg2 import Error
 import os
 from threading import Lock
 
 load_dotenv()
 
-class MySQLHeatwaveClient:
+class PostgreSQLClient:
     _instance = None
     _lock = Lock()  
 
     def __new__(cls, *args, **kwargs):
         with cls._lock:
             if cls._instance is None:
-                cls._instance = super(MySQLHeatwaveClient, cls).__new__(cls)
+                cls._instance = super(PostgreSQLClient, cls).__new__(cls)
         return cls._instance
 
     def __init__(self):
         if not hasattr(self, "_initialized"):  # prevent reinitialization
-            self.host = os.getenv('MYSQL_HEATWAVE_HOST')
-            self.port = int(os.getenv('MYSQL_HEATWAVE_PORT'))
-            self.user = os.getenv('MYSQL_HEATWAVE_USER')
-            self.password = os.getenv('MYSQL_HEATWAVE_PASSWORD')
-            self.database = os.getenv('MYSQL_HEATWAVE_DATABASE')
+            self.database_url = os.getenv('DATABASE_URL')
             self.connection = None
             self._initialized = True
 
     def connect(self):
-        if self.connection and self.connection.is_connected():
+        if self.connection and not self.connection.closed:
             return self.connection
 
         try:
-            self.connection = mysql.connector.connect(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                password=self.password,
-                database=self.database
-            )
-            print("Connected to MySQL HeatWave successfully.")
-        except mysql.connector.Error as err:
+            self.connection = psycopg2.connect(self.database_url)
+            print("Connected to PostgreSQL successfully.")
+        except psycopg2.Error as err:
             print(f"Connection failed: {err}")
             self.connection = None
 

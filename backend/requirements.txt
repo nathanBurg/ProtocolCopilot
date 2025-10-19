@@ -1,2 +1,6 @@
-mysql-connector-python==9.4.0
 python-dotenv==1.1.1
+uvicorn==0.38.0
+fastapi==0.115.6
+pydantic==2.12.3
+google-genai==1.45.0
+psycopg2==2.9.11
