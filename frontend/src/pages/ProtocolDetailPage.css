@@ -224,6 +224,91 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.experiments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.experiment-controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.start-experiment-btn,
+.stop-experiment-btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.start-experiment-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+.start-experiment-btn:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+.stop-experiment-btn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.stop-experiment-btn:hover {
+  background-color: #c82333;
+  transform: translateY(-1px);
+}
+
+.voice-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid #e9ecef;
+}
+
+.voice-indicator {
+  font-size: 1.5rem;
+  animation: pulse 1.5s infinite;
+}
+
+.voice-indicator.listening {
+  animation: pulse 0.8s infinite;
+}
+
+.voice-indicator.processing {
+  animation: spin 1s linear infinite;
+}
+
+.voice-status-text {
+  font-size: 1rem;
+  color: #333;
+  font-weight: 500;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .section-title {
   margin: 0 0 1.5rem 0;
   font-size: 1.5rem;

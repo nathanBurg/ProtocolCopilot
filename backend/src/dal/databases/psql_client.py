@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import psycopg2
-from psycopg2 import Error
+from psycopg2 import Error, OperationalError
 import os
 from threading import Lock
 
@@ -8,7 +8,7 @@ load_dotenv()
 
 class PostgreSQLClient:
     _instance = None
-    _lock = Lock()  
+    _lock = Lock()
 
     def __new__(cls, *args, **kwargs):
         with cls._lock:
@@ -17,37 +17,48 @@ class PostgreSQLClient:
         return cls._instance
 
     def __init__(self):
-        if not hasattr(self, "_initialized"):  # prevent reinitialization
-            self.database_url = os.getenv('DATABASE_URL')
+        if not hasattr(self, "_initialized"):
+            self.database_url = os.getenv("DATABASE_URL")
             self.connection = None
             self._initialized = True
+            self.connect()
 
     def connect(self):
-        # Always create a new connection for each request to avoid connection issues
+        """Establish or re-establish the connection."""
+        if self.connection and not self.connection.closed:
+            return self.connection
         try:
-            connection = psycopg2.connect(self.database_url)
+            self.connection = psycopg2.connect(self.database_url)
+            self.connection.autocommit = False
             print("Connected to PostgreSQL successfully.")
-            return connection
-        except psycopg2.Error as err:
-            print(f"Connection failed: {err}")
-            return None
+        except Error as e:
+            print(f"Connection failed: {e}")
+            self.connection = None
+        return self.connection
 
-    def execute_sql(self, sql: str):
-        """Execute a SQL string (single or multiple statements)."""
+    def execute_sql(self, sql: str, params=None):
+        """Execute SQL, keeping persistent connection alive."""
         conn = self.connect()
         if not conn:
             print("No active connection.")
             return
 
-        cursor = conn.cursor()
         try:
-            statements = [stmt.strip() for stmt in sql.split(';') if stmt.strip()]
-            for stmt in statements:
-                cursor.execute(stmt)
-            conn.commit()
-        except Error as e:
+            with conn.cursor() as cursor:
+                statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+                for stmt in statements:
+                    cursor.execute(stmt, params)
+                conn.commit()
+        except (Error, OperationalError) as e:
             print(f"Error executing SQL: {e}")
-        finally:
-            cursor.close()
-            conn.close()
+            if conn:
+                conn.rollback()
+                # Try reconnecting if connection dropped
+                self.connection = None
+        return
 
+    def close(self):
+        """Manually close the connection."""
+        if self.connection and not self.connection.closed:
+            self.connection.close()
+            print("Connection closed.")

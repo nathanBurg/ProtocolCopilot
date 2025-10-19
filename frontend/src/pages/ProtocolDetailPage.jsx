@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getProtocol, getProtocolSteps } from '../services/api'
 import './ProtocolDetailPage.css'
@@ -14,6 +14,12 @@ function ProtocolDetailPage() {
   const [showSteps, setShowSteps] = useState(false)
   const [loadingSteps, setLoadingSteps] = useState(false)
   const [stepsError, setStepsError] = useState(null)
+  
+  // Voice interaction state
+  const [isExperimentActive, setIsExperimentActive] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const experimentActiveRef = useRef(false)
 
   useEffect(() => {
     const fetchProtocol = async () => {
@@ -55,6 +61,141 @@ function ProtocolDetailPage() {
     } finally {
       setLoadingSteps(false)
     }
+  }
+
+  // Voice interaction functions
+  const recordUntilSilence = async () => {
+    console.log("Starting recordUntilSilence...");
+    // Request high-quality audio for better transcription
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 44100,
+        channelCount: 1
+      }
+    });
+    console.log("Got media stream with enhanced audio settings");
+    
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, {
+      mimeType: 'audio/webm;codecs=opus'
+    });
+    recorder.ondataavailable = e => chunks.push(e.data);
+  
+    // Simple timeout-based recording instead of silence detection
+    const RECORDING_DURATION = 5000; // Record for 5 seconds max
+    
+    recorder.start();
+    console.log("Recorder started - will record for", RECORDING_DURATION, "ms");
+    
+    return new Promise(resolve => {
+      // Stop recording after fixed duration
+      setTimeout(() => {
+        if (recorder.state === "recording") {
+          console.log("Recording timeout reached - stopping recorder");
+          recorder.stop();
+        }
+      }, RECORDING_DURATION);
+      
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        console.log("Recording stopped, blob size:", blob.size);
+        resolve(blob);
+      };
+    });
+  };
+  
+
+  const sendToBackend = async (audioBlob) => {
+    console.log("Sending audio to backend, blob size:", audioBlob.size);
+    const form = new FormData();
+    form.append("file", audioBlob, "turn.webm");
+    const res = await fetch("/api/voice-turn", { method: "POST", body: form });
+    console.log("Backend response status:", res.status);
+    
+    if (!res.ok) {
+      throw new Error(`Backend error: ${res.status} ${res.statusText}`);
+    }
+    
+    const text = await res.text();
+    console.log("Backend response text:", text);
+    
+    try {
+      const data = JSON.parse(text);
+      console.log("Backend response data:", data);
+      return data.reply;
+    } catch (error) {
+      console.error("JSON parse error:", error);
+      console.error("Response text:", text);
+      throw new Error(`Invalid JSON response: ${text}`);
+    }
+  }
+
+  const speak = (text) => {
+    return new Promise(resolve => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = resolve;
+      speechSynthesis.speak(utterance);
+    });
+  }
+
+  const conversationLoop = async () => {
+    console.log("conversationLoop called, experimentActiveRef.current:", experimentActiveRef.current);
+    if (!experimentActiveRef.current) return;
+    
+    try {
+      console.log("Setting voice status to listening...");
+      setVoiceStatus("🎤 Listening...");
+      setIsListening(true);
+      console.log("Calling recordUntilSilence...");
+      const audio = await recordUntilSilence();
+      console.log("Got audio, setting status to processing...");
+      setVoiceStatus("🔄 Processing...");
+      setIsListening(false);
+      console.log("Sending to backend...");
+      const reply = await sendToBackend(audio);
+      console.log("Got reply:", reply);
+      setVoiceStatus(`🤖 ${reply}`);
+      await speak(reply);
+      setVoiceStatus("");
+      // Wait for user to speak again - don't auto-continue
+      console.log("Waiting for user to speak again...");
+      if (experimentActiveRef.current) {
+        setTimeout(conversationLoop, 2000); // Wait 2 seconds before listening again
+      }
+    } catch (error) {
+      console.error("Error in conversation loop:", error);
+      setVoiceStatus(`❌ Error: ${error.message}`);
+      setIsListening(false);
+    }
+  }
+
+  const startExperiment = async () => {
+    console.log("startExperiment called");
+    try {
+      console.log("Requesting microphone permission...");
+      // Request microphone permission
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("Microphone permission granted");
+      setIsExperimentActive(true);
+      experimentActiveRef.current = true;
+      setVoiceStatus("🎤 Starting experiment...");
+      console.log("Starting conversation loop...");
+      conversationLoop();
+    } catch (error) {
+      console.error("Error in startExperiment:", error);
+      setVoiceStatus(`❌ Microphone access denied: ${error.message}`);
+    }
+  }
+
+  const stopExperiment = () => {
+    console.log("stopExperiment called");
+    setIsExperimentActive(false);
+    experimentActiveRef.current = false;
+    setVoiceStatus("");
+    setIsListening(false);
   }
 
   if (loading) {
@@ -185,7 +326,38 @@ function ProtocolDetailPage() {
 
         {/* Experiments Section */}
         <div className="experiments-section">
-          <h3 className="section-title">Experiments</h3>
+          <div className="experiments-header">
+            <h3 className="section-title">Experiments</h3>
+            <div className="experiment-controls">
+              {!isExperimentActive ? (
+                <button 
+                  onClick={startExperiment}
+                  className="start-experiment-btn"
+                >
+                  🎤 Start Experiment
+                </button>
+              ) : (
+                <button 
+                  onClick={stopExperiment}
+                  className="stop-experiment-btn"
+                >
+                  ⏹️ Stop Experiment
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {isExperimentActive && (
+            <div className="voice-status">
+              <div className={`voice-indicator ${isListening ? 'listening' : 'processing'}`}>
+                {isListening ? '🎤' : '🔄'}
+              </div>
+              <div className="voice-status-text">
+                {voiceStatus}
+              </div>
+            </div>
+          )}
+          
           <div className="experiments-placeholder">
             <p>No experiments yet. This section will be implemented soon.</p>
           </div>
