@@ -51,3 +51,16 @@ class ProtocolStep(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CreateProtocolPreviewRequest(BaseModel):
+    filename: str
+    file_type: str
+    file_extension: str
+    file_content: bytes
+    file_size: Optional[int] = None
+    description: Optional[str] = None
+    created_by_user_id: Optional[uuid.UUID] = None
+
+    class Config:
+        from_attributes = True
