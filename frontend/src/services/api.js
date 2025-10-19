@@ -64,3 +64,52 @@ export const getProtocolSteps = async (protocolId) => {
     throw new Error(`Failed to fetch protocol steps: ${error.message}`)
   }
 }
+
+export const startExperiment = async (protocolId, userId = null) => {
+  try {
+    const response = await api.post('/experiments/start', {
+      protocol_id: protocolId,
+      user_id: userId
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(`Failed to start experiment: ${error.message}`)
+  }
+}
+
+export const stopExperiment = async (experimentId, endTime = null) => {
+  try {
+    const response = await api.post('/experiments/stop', {
+      experiment_id: experimentId,
+      end_time: endTime
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(`Failed to stop experiment: ${error.message}`)
+  }
+}
+
+export const voiceTurn = async (audioFile) => {
+  try {
+    const formData = new FormData()
+    formData.append('file', audioFile, 'turn.webm')
+    
+    const response = await uploadApi.post('/experiments/voice-turn', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(`Failed to process voice turn: ${error.message}`)
+  }
+}
+
+export const getExperimentsByProtocol = async (protocolId) => {
+  try {
+    const response = await api.get(`/experiments/protocol/${protocolId}`)
+    return response.data
+  } catch (error) {
+    throw new Error(`Failed to fetch experiments: ${error.message}`)
+  }
+}

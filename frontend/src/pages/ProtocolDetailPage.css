@@ -352,3 +352,137 @@
     padding: 1rem;
   }
 }
+
+/* Experiments List Styles */
+.experiments-list {
+  margin-top: 1rem;
+}
+
+.experiments-list h4 {
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.experiments-table {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.experiment-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr 1.5fr 1fr;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #ddd;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.experiment-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr 1.5fr 1fr;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.experiment-row:hover {
+  background-color: #f8f9fa;
+}
+
+.experiment-row:last-child {
+  border-bottom: none;
+}
+
+.exp-id {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.exp-status {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-in_progress {
+  color: #007bff;
+}
+
+.status-completed {
+  color: #28a745;
+}
+
+.status-failed {
+  color: #dc3545;
+}
+
+.exp-start,
+.exp-end {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.exp-duration {
+  color: #666;
+  font-weight: 500;
+}
+
+.no-experiments {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px dashed #ddd;
+}
+
+.current-experiment {
+  background: #e7f3ff;
+  border: 1px solid #b3d9ff;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.current-experiment h4 {
+  margin: 0 0 0.5rem 0;
+  color: #0066cc;
+}
+
+.experiment-info p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+/* Responsive design for experiments table */
+@media (max-width: 768px) {
+  .experiment-header,
+  .experiment-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .experiment-header > div,
+  .experiment-row > div {
+    padding: 0.25rem 0;
+  }
+  
+  .experiment-header > div:before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+  }
+  
+  .exp-id:before { content: "ID: "; }
+  .exp-status:before { content: "Status: "; }
+  .exp-start:before { content: "Start: "; }
+  .exp-end:before { content: "End: "; }
+  .exp-duration:before { content: "Duration: "; }
+}

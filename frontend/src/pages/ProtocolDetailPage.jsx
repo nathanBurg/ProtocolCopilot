@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { getProtocol, getProtocolSteps } from '../services/api'
+import { getProtocol, getProtocolSteps, startExperiment, stopExperiment, getExperimentsByProtocol } from '../services/api'
 import './ProtocolDetailPage.css'
 
 function ProtocolDetailPage() {
@@ -20,6 +20,15 @@ function ProtocolDetailPage() {
   const [voiceStatus, setVoiceStatus] = useState('')
   const [isListening, setIsListening] = useState(false)
   const experimentActiveRef = useRef(false)
+  
+  // Experiment state
+  const [currentExperimentId, setCurrentExperimentId] = useState(null)
+  const [experimentStatus, setExperimentStatus] = useState('')
+  
+  // Experiments list state
+  const [experiments, setExperiments] = useState([])
+  const [loadingExperiments, setLoadingExperiments] = useState(false)
+  const [experimentsError, setExperimentsError] = useState(null)
 
   useEffect(() => {
     const fetchProtocol = async () => {
@@ -36,6 +45,25 @@ function ProtocolDetailPage() {
 
     if (protocolId) {
       fetchProtocol()
+    }
+  }, [protocolId])
+
+  useEffect(() => {
+    const fetchExperiments = async () => {
+      try {
+        setLoadingExperiments(true)
+        setExperimentsError(null)
+        const data = await getExperimentsByProtocol(protocolId)
+        setExperiments(data.experiments || [])
+      } catch (err) {
+        setExperimentsError(err.message)
+      } finally {
+        setLoadingExperiments(false)
+      }
+    }
+
+    if (protocolId) {
+      fetchExperiments()
     }
   }, [protocolId])
 
@@ -112,7 +140,7 @@ function ProtocolDetailPage() {
     console.log("Sending audio to backend, blob size:", audioBlob.size);
     const form = new FormData();
     form.append("file", audioBlob, "turn.webm");
-    const res = await fetch("/api/voice-turn", { method: "POST", body: form });
+    const res = await fetch("/api/experiments/voice-turn", { method: "POST", body: form });
     console.log("Backend response status:", res.status);
     
     if (!res.ok) {
@@ -172,30 +200,60 @@ function ProtocolDetailPage() {
     }
   }
 
-  const startExperiment = async () => {
-    console.log("startExperiment called");
+  const handleStartExperiment = async () => {
+    console.log("handleStartExperiment called");
     try {
       console.log("Requesting microphone permission...");
       // Request microphone permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
       console.log("Microphone permission granted");
+      
+      // Call the API to start the experiment
+      console.log("Calling start experiment API...");
+      const response = await startExperiment(protocolId);
+      console.log("Experiment started:", response);
+      
+      setCurrentExperimentId(response.experiment_id);
+      setExperimentStatus(response.status);
       setIsExperimentActive(true);
       experimentActiveRef.current = true;
       setVoiceStatus("🎤 Starting experiment...");
       console.log("Starting conversation loop...");
+      
+      // Refresh experiments list
+      const experimentsData = await getExperimentsByProtocol(protocolId);
+      setExperiments(experimentsData.experiments || []);
+      
       conversationLoop();
     } catch (error) {
-      console.error("Error in startExperiment:", error);
-      setVoiceStatus(`❌ Microphone access denied: ${error.message}`);
+      console.error("Error in handleStartExperiment:", error);
+      setVoiceStatus(`❌ Error starting experiment: ${error.message}`);
     }
   }
 
-  const stopExperiment = () => {
-    console.log("stopExperiment called");
-    setIsExperimentActive(false);
-    experimentActiveRef.current = false;
-    setVoiceStatus("");
-    setIsListening(false);
+  const handleStopExperiment = async () => {
+    console.log("handleStopExperiment called");
+    try {
+      if (currentExperimentId) {
+        console.log("Calling stop experiment API...");
+        const response = await stopExperiment(currentExperimentId);
+        console.log("Experiment stopped:", response);
+        setExperimentStatus(response.status);
+      }
+      
+      setIsExperimentActive(false);
+      experimentActiveRef.current = false;
+      setVoiceStatus("");
+      setIsListening(false);
+      setCurrentExperimentId(null);
+      
+      // Refresh experiments list
+      const experimentsData = await getExperimentsByProtocol(protocolId);
+      setExperiments(experimentsData.experiments || []);
+    } catch (error) {
+      console.error("Error in handleStopExperiment:", error);
+      setVoiceStatus(`❌ Error stopping experiment: ${error.message}`);
+    }
   }
 
   if (loading) {
@@ -331,14 +389,14 @@ function ProtocolDetailPage() {
             <div className="experiment-controls">
               {!isExperimentActive ? (
                 <button 
-                  onClick={startExperiment}
+                  onClick={handleStartExperiment}
                   className="start-experiment-btn"
                 >
                   🎤 Start Experiment
                 </button>
               ) : (
                 <button 
-                  onClick={stopExperiment}
+                  onClick={handleStopExperiment}
                   className="stop-experiment-btn"
                 >
                   ⏹️ Stop Experiment
@@ -358,8 +416,60 @@ function ProtocolDetailPage() {
             </div>
           )}
           
-          <div className="experiments-placeholder">
-            <p>No experiments yet. This section will be implemented soon.</p>
+          {currentExperimentId && (
+            <div className="current-experiment">
+              <div className="experiment-info">
+                <h4>Current Experiment</h4>
+                <p><strong>Experiment ID:</strong> {currentExperimentId}</p>
+                <p><strong>Status:</strong> {experimentStatus}</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Experiments List */}
+          <div className="experiments-list">
+            <h4>Experiment History</h4>
+            {loadingExperiments ? (
+              <div className="loading">Loading experiments...</div>
+            ) : experimentsError ? (
+              <div className="error">Error loading experiments: {experimentsError}</div>
+            ) : experiments.length === 0 ? (
+              <div className="no-experiments">
+                <p>No experiments yet. Click &quot;Start Experiment&quot; to begin.</p>
+              </div>
+            ) : (
+              <div className="experiments-table">
+                <div className="experiment-header">
+                  <div className="exp-id">Experiment ID</div>
+                  <div className="exp-status">Status</div>
+                  <div className="exp-start">Start Time</div>
+                  <div className="exp-end">End Time</div>
+                  <div className="exp-duration">Duration</div>
+                </div>
+                {experiments.map((experiment) => (
+                  <div key={experiment.experiment_id} className="experiment-row">
+                    <div className="exp-id">{experiment.experiment_id.substring(0, 8)}...</div>
+                    <div className={`exp-status status-${experiment.status}`}>
+                      {experiment.status}
+                    </div>
+                    <div className="exp-start">
+                      {experiment.start_time ? new Date(experiment.start_time).toLocaleString() : '-'}
+                    </div>
+                    <div className="exp-end">
+                      {experiment.end_time ? new Date(experiment.end_time).toLocaleString() : '-'}
+                    </div>
+                    <div className="exp-duration">
+                      {experiment.start_time && experiment.end_time 
+                        ? `${Math.round((new Date(experiment.end_time) - new Date(experiment.start_time)) / 1000 / 60)} min`
+                        : experiment.start_time 
+                        ? 'In progress'
+                        : '-'
+                      }
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -368,3 +478,4 @@ function ProtocolDetailPage() {
 }
 
 export default ProtocolDetailPage
+
