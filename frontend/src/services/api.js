@@ -55,3 +55,12 @@ export const createProtocol = async (protocol, protocolSteps) => {
     throw new Error(`Failed to create protocol: ${error.message}`)
   }
 }
+
+export const getProtocolSteps = async (protocolId) => {
+  try {
+    const response = await api.get(`/protocol_steps/${protocolId}`)
+    return response.data
+  } catch (error) {
+    throw new Error(`Failed to fetch protocol steps: ${error.message}`)
+  }
+}

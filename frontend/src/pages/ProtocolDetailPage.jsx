@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { getProtocol } from '../services/api'
+import { getProtocol, getProtocolSteps } from '../services/api'
 import './ProtocolDetailPage.css'
 
 function ProtocolDetailPage() {
@@ -8,6 +8,12 @@ function ProtocolDetailPage() {
   const [protocol, setProtocol] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Steps state
+  const [steps, setSteps] = useState([])
+  const [showSteps, setShowSteps] = useState(false)
+  const [loadingSteps, setLoadingSteps] = useState(false)
+  const [stepsError, setStepsError] = useState(null)
 
   useEffect(() => {
     const fetchProtocol = async () => {
@@ -26,6 +32,30 @@ function ProtocolDetailPage() {
       fetchProtocol()
     }
   }, [protocolId])
+
+  const handleStepsToggle = async () => {
+    if (showSteps) {
+      setShowSteps(false)
+      return
+    }
+
+    if (steps.length > 0) {
+      setShowSteps(true)
+      return
+    }
+
+    try {
+      setLoadingSteps(true)
+      setStepsError(null)
+      const stepsData = await getProtocolSteps(protocolId)
+      setSteps(stepsData)
+      setShowSteps(true)
+    } catch (error) {
+      setStepsError(error.message)
+    } finally {
+      setLoadingSteps(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -112,6 +142,45 @@ function ProtocolDetailPage() {
               <p>{new Date(protocol.updated_at).toLocaleString()}</p>
             </div>
           </div>
+        </div>
+
+        {/* Steps Section */}
+        <div className="steps-section">
+          <div className="steps-header">
+            <h3 className="section-title">Protocol Steps</h3>
+            <button 
+              onClick={handleStepsToggle}
+              className="steps-toggle-btn"
+              disabled={loadingSteps}
+            >
+              {loadingSteps ? 'Loading...' : showSteps ? 'Hide Steps' : 'Show Steps'}
+            </button>
+          </div>
+          
+          {showSteps && (
+            <div className="steps-content">
+              {stepsError ? (
+                <div className="steps-error">Error loading steps: {stepsError}</div>
+              ) : steps.length === 0 ? (
+                <div className="no-steps">No steps available</div>
+              ) : (
+                <div className="steps-list">
+                  {steps.map((step, index) => (
+                    <div key={step.protocol_step_id || index} className="step-item">
+                      <div className="step-header">
+                        <span className="step-number">Step {step.step_number}</span>
+                        <span className="step-duration">
+                          {step.expected_duration_minutes ? `${step.expected_duration_minutes} min` : ''}
+                        </span>
+                      </div>
+                      <h4 className="step-name">{step.step_name}</h4>
+                      <p className="step-instruction">{step.instruction}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Experiments Section */}

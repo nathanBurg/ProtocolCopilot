@@ -8,72 +8,7 @@ from src.core.services.protocol_service import ProtocolService
 
 router = APIRouter()
 
-# Create fake data at module level so it stays consistent across requests
-_fake_documents = [
-    ProtocolDocument(
-        document_id=uuid.UUID("550e8400-e29b-41d4-a716-446655440001"),
-        document_name="Western Blot Protocol.pdf",
-        description="Standard Western Blot procedure for protein analysis",
-        object_url="https://example.com/documents/western_blot.pdf",
-        mime_type="application/pdf",
-        ingestion_status=IngestionStatus.INGESTED,
-        ingested_at=datetime.now(),
-        created_at=datetime.now(),
-        updated_at=datetime.now()
-    ),
-    ProtocolDocument(
-        document_id=uuid.UUID("550e8400-e29b-41d4-a716-446655440002"),
-        document_name="PCR Amplification Guide.pdf",
-        description="Polymerase Chain Reaction protocol for DNA amplification",
-        object_url="https://example.com/documents/pcr_guide.pdf",
-        mime_type="application/pdf",
-        ingestion_status=IngestionStatus.INGESTED,
-        ingested_at=datetime.now(),
-        created_at=datetime.now(),
-        updated_at=datetime.now()
-    ),
-    ProtocolDocument(
-        document_id=uuid.UUID("550e8400-e29b-41d4-a716-446655440003"),
-        document_name="Cell Culture Maintenance.pdf",
-        description="Routine cell culture maintenance and passaging procedures",
-        object_url="https://example.com/documents/cell_culture.pdf",
-        mime_type="application/pdf",
-        ingestion_status=IngestionStatus.PENDING,
-        ingested_at=None,
-        created_at=datetime.now(),
-        updated_at=datetime.now()
-    )
-]
-
-_fake_protocols = [
-    Protocol(
-        protocol_id=uuid.UUID("650e8400-e29b-41d4-a716-446655440001"),
-        document_id=_fake_documents[0].document_id,
-        protocol_name="Western Blot Analysis",
-        description="Complete Western Blot protocol for protein detection and quantification",
-        created_by_user_id=uuid.UUID("750e8400-e29b-41d4-a716-446655440001"),
-        created_at=datetime.now(),
-        updated_at=datetime.now()
-    ),
-    Protocol(
-        protocol_id=uuid.UUID("650e8400-e29b-41d4-a716-446655440002"),
-        document_id=_fake_documents[1].document_id,
-        protocol_name="PCR DNA Amplification",
-        description="Standard PCR protocol for amplifying specific DNA sequences",
-        created_by_user_id=uuid.UUID("750e8400-e29b-41d4-a716-446655440002"),
-        created_at=datetime.now(),
-        updated_at=datetime.now()
-    ),
-    Protocol(
-        protocol_id=uuid.UUID("650e8400-e29b-41d4-a716-446655440003"),
-        document_id=_fake_documents[2].document_id,
-        protocol_name="Mammalian Cell Culture",
-        description="Protocol for maintaining and passaging mammalian cell lines",
-        created_by_user_id=uuid.UUID("750e8400-e29b-41d4-a716-446655440003"),
-        created_at=datetime.now(),
-        updated_at=datetime.now()
-    )
-]
+# Fake data removed - now using real database endpoints
 
 @router.get("/protocols", tags=["protocols"], response_model=List[Protocol])
 async def get_protocols():
@@ -162,45 +97,9 @@ async def create_protocol(protocol: Protocol, protocol_steps: List[ProtocolStep]
     """Create a new protocol with its steps"""
     
     try:
+        # TODO: should be service method 
         protocol_dal = ProtocolDAL()
-        
-        # Create a dummy protocol document if document_id doesn't exist
-        # This is needed for manually created protocols that don't have an associated document
-        try:
-            existing_document = protocol_dal.get_protocol_document(str(protocol.document_id))
-            if not existing_document:
-                # Create a dummy document for manually created protocols
-                dummy_document = ProtocolDocument(
-                    document_id=protocol.document_id,
-                    document_name=f"Manual Protocol - {protocol.protocol_name}",
-                    description="Manually created protocol (no source document)",
-                    object_url="",
-                    mime_type="text/plain",
-                    ingestion_status=IngestionStatus.INGESTED,
-                    ingested_at=datetime.now(),
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
-                )
-                protocol_dal.create_protocol_document(dummy_document)
-        except Exception as doc_error:
-            # If document lookup fails, create the dummy document
-            dummy_document = ProtocolDocument(
-                document_id=protocol.document_id,
-                document_name=f"Manual Protocol - {protocol.protocol_name}",
-                description="Manually created protocol (no source document)",
-                object_url="",
-                mime_type="text/plain",
-                ingestion_status=IngestionStatus.INGESTED,
-                ingested_at=datetime.now(),
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
-            protocol_dal.create_protocol_document(dummy_document)
-        
-        # Now create the protocol
         saved_protocol = protocol_dal.create_protocol(protocol)
-        
-        # Create protocol steps
         for step in protocol_steps:
             protocol_dal.create_protocol_step(step)
         
@@ -209,7 +108,7 @@ async def create_protocol(protocol: Protocol, protocol_steps: List[ProtocolStep]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating protocol: {str(e)}")
 
-@router.get("/protocols/{protocol_id}/steps", tags=["protocols"], response_model=List[ProtocolStep])
+@router.get("/protocol_steps/{protocol_id}", tags=["protocols"], response_model=List[ProtocolStep])
 async def get_protocol_steps(protocol_id: str):
     """Get all steps for a specific protocol"""
     try:
@@ -223,36 +122,3 @@ async def get_protocol_steps(protocol_id: str):
         return steps
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching protocol steps: {str(e)}")
-
-@router.get("/protocols/{protocol_id}/complete", tags=["protocols"], response_model=ProtocolPreviewResponse)
-async def get_protocol_complete(protocol_id: str):
-    """Get a complete protocol with its steps"""
-    try:
-        protocol_uuid = uuid.UUID(protocol_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid protocol ID format")
-    
-    try:
-        protocol_dal = ProtocolDAL()
-        
-        # Get the protocol
-        protocol = protocol_dal.get_protocol(str(protocol_uuid))
-        if not protocol:
-            raise HTTPException(status_code=404, detail="Protocol not found")
-        
-        # Get the protocol steps
-        steps = protocol_dal.get_protocol_steps_by_protocol_id(str(protocol_uuid))
-        
-        # Get the document to find the object URL
-        document = protocol_dal.get_protocol_document(str(protocol.document_id))
-        object_url = document.object_url if document else ""
-        
-        return ProtocolPreviewResponse(
-            protocol=protocol,
-            protocol_steps=steps,
-            object_url=object_url
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching complete protocol: {str(e)}")
